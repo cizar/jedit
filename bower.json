@@ -1,0 +1,21 @@
+{
+  "name": "jedit",
+  "version": "0.0.1",
+  "homepage": "https://github.com/cizar/jedit",
+  "authors": [
+    "Cesar Kastli <cesarkastli@gmail.com>"
+  ],
+  "description": "Asynchronous jQuery in-place edit plugin",
+  "main": "js/jquery.jedit.js",
+  "moduleType": [
+    "node"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "jedit",
+  "version": "0.0.1",
+  "description": "Asynchronous jQuery in-place edit plugin",
+  "main": "src/jquery.jedit.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cizar/jedit.git"
+  },
+  "author": "Cesar Kastli <cesarkastli@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cizar/jedit/issues"
+  },
+  "homepage": "https://github.com/cizar/jedit"
+}
