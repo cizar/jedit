@@ -175,7 +175,12 @@
   Plugin.prototype.load = function() {
     var opts = this._options;
     if (opts.load) {
-      return $.when(opts.load.call(this));
+      var d = $.Deferred();
+      var ret = opts.load.call(this, function(err, data) {
+        if (err !== null) return d.reject(err);
+        d.resolve(data);
+      });
+      return (ret !== undefined) ? $.when(ret) : d.promise();
     } if (opts.loadurl) {
       var data = {};
       data['id'] = this._element.id;
@@ -192,7 +197,12 @@
   Plugin.prototype.save = function(value) {
     var opts = this._options;
     if (opts.save) {
-      return $.when(opts.save.call(this, value));
+      var d = $.Deferred();
+      var ret = opts.save.call(this, value, function(err, data) {
+        if (err !== null) return d.reject(err);
+        d.resolve(data);
+      });
+      return (ret !== undefined) ? $.when(ret) : d.promise();
     } else if (opts.saveurl) {
       var data = {};
       data['id'] = this._element.id;
