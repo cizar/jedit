@@ -1,61 +1,41 @@
-;(function($, undefined) {
+;(function($, window, document, undefined) {
 
   'use strict';
 
   var pluginName = 'jedit';
-  
+
   var defaults = {
-    'accept': null,
-    'acceptclass': null,
-    'cancel': null,
-    'cancelclass': null,
-    'placeholder': 'Click to edit...',
-
-    'event': 'click',
-    'type': 'text',
-
-    'load': null,
-    'loadurl': null,
-    'loadtype': 'GET',
-    'loaddata': null,
-    'loadopts': null,
-
-    'save': null,
-    'saveurl': null,
-    'savetype': 'POST',
-    'savedata': null,
-    'saveopts': null,
-
-    'restore': null,
-
-    'rows': null,
-    'cols': null,
-
-    'options': null,
-    'optionsurl': null,
-
-    'onreset': null,
-    'onblur': 'restore'
+    accept: null,
+    acceptclass: null,
+    cancel: null,
+    cancelclass: null,
+    placeholder: 'Click to edit...',
+    event: 'click',
+    type: 'text',
+    load: null,
+    loadurl: null,
+    loadtype: 'GET',
+    loaddata: null,
+    loadopts: null,
+    save: null,
+    saveurl: null,
+    savetype: 'POST',
+    savedata: null,
+    saveopts: null,
+    rows: null,
+    cols: null,
+    options: null,
+    optionsurl: null,
+    classprefix: 'ui-editable'
   };
 
   var widgetBase = {
-    enable: function() {
-      $(':input', this).prop('disabled', false);
-    },
-    disable: function() {
-      $(':input', this).prop('disabled', true);
-    },
-    select: function() {
-      $(':input:visible:enabled:first', this).select();
-    },
-    get: function() {
+    val: function() {
       return $(':input:visible:first', this).val();
     },
-    set: function(value) {
-      $(':input:visible:first', this).val(value);
-    },
-    controls: function(options) {
-      var $controls = $('<div class="ui-editable-controls"/>');
+    addButtons: function(options) {
+      var $controls = $('<div/>')
+        .addClass(options.classprefix + '-buttons');
       if (options.accept) {
         $('<button type="submit">')
           .html(options.accept)
@@ -74,42 +54,48 @@
 
   var widgets = {
     text: {
-      render: function(options) {
-        var $input = $('<input type="text"/>');
-        return $input.appendTo(this);
+      render: function(value, options) {
+        var $elem = $('<input type="text"/>')
+          .val(value)
+          .appendTo(this)
+          .select();
+        return $elem;
       }
     },
     textarea: {
-      render: function(options) {
-        var $textarea = $('<textarea/>');
+      render: function(value, options) {
+        var $elem = $('<textarea/>')
+          .val(value)
+          .appendTo(this);
         if (options.cols) {
-          $textarea.attr('cols', options.cols);
+          $elem.attr('cols', options.cols);
         }
         if (options.rows) {
-          $textarea.attr('rows', options.rows);
+          $elem.attr('rows', options.rows);
         }
-        return $textarea.appendTo(this);
+        return $elem;
       }
     },
     select: {
-      render: function(options) {
-        var $select = $('<select/>');
+      render: function(value, options) {
+        var $elem = $('<select/>');
         $.each(options.options, function() {
           $('<option/>')
             .val(this.value)
             .text(this.text)
-            .appendTo($select);
+            .appendTo($elem);
         });
+        $elem.val(value).appendTo(this);
         if (!options.accept) {
           var $form = $(this);
-          $select.on('change', function(event) {
+          $elem.on('change', function(event) {
             $form.trigger('submit');
           });
         }
-        return $select.appendTo(this);
+        return $elem;
       }
     }
-  }
+  };
 
   var Plugin = function(element, options) {
     if ('string' === $.type(options)) {
@@ -119,227 +105,97 @@
     }
     this._element = element;
     this._options = $.extend({}, defaults, options, $(element).data());
-    this._state = {};
     this._init();
-  }
+  };
 
   Plugin.prototype._init = function() {
-    this._on(this._element, this._options.event, this.onActivate);
-    this._on(this._element, 'state', function(event) {
-      $.each(this._state, function(state, value) {
-        $(this).toggleClass('ui-editable-' + state, value);
-      }.bind(this._element));
+    var self = this;
+    var opts = this._options;
+    self._original = $.trim($(self._element).html());
+    self._widget = $.extend({}, widgetBase, widgets[opts.type]);
+    if (!self._original) {
+      $(self._element).html(opts.placeholder);
+    }
+    $(self._element).on(opts.event, function(event) {
+      if (self._editorPromise && 'pending' === self._editorPromise.state()) {
+        return;
+      }
+      var edit = self.edit.bind(self),
+          save = self.save.bind(self);
+      self._editorPromise = self.load().then(edit).then(save).done(function(value) {
+        self._original = $.trim(value);
+      }).fail(function(response) {
+        if ($.isPlainObject(response) && response.status) {
+          console.log(response.status);
+        } else {
+          console.log('Error interno', response);
+        }
+      }).always(function() {
+        $(self._element).html(self._original || opts.placeholder).removeClass(opts.classprefix + '-editing');
+      });
+      $(self._element).addClass(opts.classprefix + '-editing');
     });
-    $(this._element).addClass('ui-editable ui-editable-' + this._options.type + ' ui-editable-' + $(this._element).css('display'));
-    this._setState(this._getInitialState());
-    this._original = $.trim($(this._element).html());
-    this._widget = $.extend({}, widgetBase, widgets[this._options.type]);
-    if (!this._original) {
-      $(this._element).html(this._options.placeholder);
-    }
+    $(self._element).on('changestate', function(event) {
+      $.each(self._state, function(state, value) {
+        $(self._element).toggleClass(opts.classprefix + '-' + state, value);
+      });
+    });
+    $(this._element).addClass(opts.classprefix
+      + ' ' + opts.classprefix + '-' + opts.type
+      + ' ' + opts.classprefix + '-' + $(this._element).css('display')
+    );
   };
 
-  Plugin.prototype._on = function(element, eventName, eventHandler) {
-    $(element).on(eventName, eventHandler.bind(this));
-  };
-
-  Plugin.prototype._trigger = function(type, event, data) {
-    var fn = this._options[type];
-    event = $.Event(event);
-    event.type = type;
-    event.target = this._element;
-    $(this._element).trigger(event, data);
-    return !($.isFunction(fn) && fn.call(this._element, event, data) === false || event.isDefaultPrevented());
-  };
-
-  Plugin.prototype._setState = function(newState) {
-    $.extend(this._state, newState);
-    this._trigger('state');
-  };
-
-  Plugin.prototype._getInitialState = function() {
-    return {
-      disabled: false,
-      editing: false,
-      loading: false,
-      restoring: false,
-      saving: false
-    }
-  };
-
-  Plugin.prototype.edit = function() {
-    if (this._state.editing) {
-      return;
-    }
-
-    this._setState({ editing: true });
-
-    var form = this._form = $('<form>');
-    this._on(form, 'submit', this.onSubmit);
-    this._on(form, 'reset', this.onReset);
-    this._on(form, 'keydown', this.onKeydown);
-    
-    this._widget.render.call(form, this._options);
-
-    this.disable();
-
-    this._widget.controls.call(form, this._options);
-
+  Plugin.prototype.edit = function(value) {
+    var d = $.Deferred();
+    var widget = this._widget;
+    var form = $('<form>');
+    $(form).on('submit', function(event) {
+      event.preventDefault();
+      d.resolve(widget.val());
+    });
+    $(form).on('reset', function(event) {
+      d.reject('Cancelled by user');
+    });
     $(this._element).empty().append(form);
-    
-    this._setState({ loading: true });
-    this.load().done(function(value) {
-      if (this._state.editing) {
-        this.val(value);
-        this.enable();
-        this.select();
-        this._trigger('loaded');
-      }
-    }).fail(function() {
-      if (this._state.editing) {
-        alert('Se ha producido un error inesperado, vuelva a intentar más tarde.');
-        this.restore();
-      }
-    }).always(function() {
-      this._setState({ loading: false });
-    });
-  }
+    widget.render.call(form, value, this._options);
+    widget.addButtons.call(form, this._options);
+    return d.promise();
+  };
 
   Plugin.prototype.load = function() {
-    var d = $.Deferred();
-
     var opts = this._options;
-
     if (opts.load) {
-      $.when(opts.load.call(this, opts))
-        .done(d.resolve.bind(this))
-        .fail(d.reject.bind(this));
-    } else if (opts.loadurl) {
-      var loaddata = {};
-      loaddata['id'] = this._element.id;
-
-      var loadAjaxOptions = $.extend({
+      return $.when(opts.load.call(this));
+    } if (opts.loadurl) {
+      var data = {};
+      data['id'] = this._element.id;
+      return $.ajax($.extend({
         context: this,
         url: opts.loadurl,
         type: opts.loadtype,
-        data: $.extend(loaddata, opts.loaddata)
-      }, opts.loadopts);
-
-      $.ajax(loadAjaxOptions)
-        .done(d.resolve.bind(this))
-        .fail(d.reject.bind(this));
-    } else {
-      d.resolveWith(this, [ this._original ]);
+        data: $.extend(data, opts.loaddata)
+      }, opts.loadopts));
     }
-
-    return d.promise();
+    return $.when(this._original);
   };
 
-  Plugin.prototype.save = function() {
-    var d = $.Deferred();
-
+  Plugin.prototype.save = function(value) {
     var opts = this._options;
-    var value = this.val();
-
     if (opts.save) {
-      $.when(opts.save.call(this, opts, value))
-        .done(d.resolve.bind(this))
-        .fail(d.reject.bind(this));
-    } else {
-      var savedata = {};
-      savedata['id'] = this._element.id;
-      savedata['value'] = value;
-
-      var saveAjaxOptions = $.extend({
+      return $.when(opts.save.call(this, value));
+    } else if (opts.saveurl) {
+      var data = {};
+      data['id'] = this._element.id;
+      data['value'] = value;
+      return $.ajax($.extend({
         context: this,
         url: opts.saveurl,
         type: opts.savetype,
-        data: $.extend(savedata, opts.savedata)
-      }, opts.saveopts);
-
-      $.ajax(saveAjaxOptions)
-        .done(d.resolve.bind(this))
-        .fail(d.reject.bind(this))
+        data: $.extend(data, opts.savedata)
+      }, opts.saveopts));
     }
-
-    return d.promise();
-  };
-
-  Plugin.prototype.restore = function() {
-    var d = $.Deferred();
-    d.resolveWith(this, [ this._original ]);
-    return d.promise();
-  };
-
-  // Widget proxy
-
-  Plugin.prototype.enable = function() {
-    if (this._state.editing) {
-      this._setState({ disabled: false });
-      this._widget.enable.call(this._form);
-    }
-  };
-
-  Plugin.prototype.disable = function() {
-    if (this._state.editing) {
-      this._setState({ disabled: true });
-      this._widget.disable.call(this._form);
-    }
-  };
-
-  Plugin.prototype.select = function() {
-    if (this._state.editing) {
-      this._widget.select.call(this._form);
-    }
-  };
-
-  Plugin.prototype.val = function(value) {
-    if (!this._state.editing) {
-      return undefined;
-    }
-    if (!arguments.length) {
-      return this._widget.get.call(this._form);
-    }
-    this._widget.set.call(this._form, value);
-  };
-
-  // Event handlers
-
-  Plugin.prototype.onActivate = function(event) {
-    this.edit();
-  };
-
-  Plugin.prototype.onSubmit = function(event) {
-    event.preventDefault();
-    this._setState({ saving: true });
-    this.save().done(function(html) {
-      this._original = $.trim(html);
-      $(this._element).html(html || this._options.placeholder);
-      this._setState({ saving: false, editing: false });
-      this._trigger('saved');
-    }).fail(function() {
-      alert('Se ha producido un error inesperado, vuelva a intentar más tarde.');
-    });
-  };
-
-  Plugin.prototype.onReset = function(event) {
-    event.preventDefault();
-    this._setState({ restoring: true });
-    this.restore().done(function(html) {
-      $(this._element).html(html || this._options.placeholder);
-      this._setState({ restoring: false, editing: false });
-      this._trigger('restored');
-    });
-  };
-
-  Plugin.prototype.onKeydown = function(event) {
-    if (event.keyCode === 27) {
-      event.preventDefault();
-      $(event.delegateTarget).trigger('reset');
-    } else if (event.ctrlKey && event.keyCode === 13) {
-      event.preventDefault();
-      $(event.delegateTarget).trigger('submit');
-    }
+    $.error('Either saveurl or save options must be defined');
   };
 
   var pluginSetup = function(options) {
@@ -349,7 +205,11 @@
   var pluginDefineWidget = function(name, widget) {
     widgets[name] = widget;
   };
-
+  
+  var pluginDefineWidgets = function(definitions) {
+    $.extend(widgets, definitions);
+  };
+  
   var pluginHandler = function(options) {
     return this.each(function() {
       if (!$(this).data('plugin_' + pluginName)) {
@@ -360,8 +220,9 @@
 
   $[pluginName] = pluginSetup;
   $[pluginName].widget = pluginDefineWidget;
+  $[pluginName].widgets = pluginDefineWidgets;
   $.fn[pluginName] = pluginHandler;
   $.fn[pluginName].defaults = defaults;
   $.fn[pluginName].widgets = widgets;
 
-})(jQuery);
+}(jQuery, window, document));
