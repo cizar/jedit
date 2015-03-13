@@ -152,10 +152,19 @@
     var form = $('<form>');
     $(form).on('submit', function(event) {
       event.preventDefault();
-      d.resolve(widget.val());
+      d.resolve(widget.val.call(form));
     });
     $(form).on('reset', function(event) {
       d.reject('Cancelled by user');
+    });
+    $(form).on('keydown', function(event) {
+      if (event.keyCode === 27) {
+        event.preventDefault();
+        $(event.delegateTarget).trigger('reset');
+      } else if (event.ctrlKey && event.keyCode === 13) {
+        event.preventDefault();
+        $(event.delegateTarget).trigger('submit');
+      }
     });
     $(this._element).empty().append(form);
     widget.render.call(form, value, this._options);
