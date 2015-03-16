@@ -26,7 +26,8 @@
     cols: null,
     options: null,
     optionsurl: null,
-    classprefix: 'ui-editable'
+    classprefix: 'ui-editable',
+    callback: null
   };
 
   var widgetBase = {
@@ -123,7 +124,9 @@
       var edit = self.edit.bind(self),
           save = self.save.bind(self);
       self._editorPromise = self.load().then(edit).then(save).done(function(value) {
-        self._original = $.trim(value);
+        value = $.trim(value);
+        self._original = value;
+        opts.callback.call(self._element, value);
       }).fail(function(response) {
         if ($.isPlainObject(response) && response.status) {
           console.log(response.status);
