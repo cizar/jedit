@@ -1,6 +1,6 @@
 {
   "name": "jedit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Asynchronous jQuery in-place edit plugin",
   "main": "src/jquery.jedit.js",
   "scripts": {
