@@ -126,7 +126,7 @@
       self._editorPromise = self.load().then(edit).then(save).done(function(value) {
         value = $.trim(value);
         self._original = value;
-        opts.callback.call(self._element, value);
+        opts.callback && opts.callback.call(self._element, value);
       }).fail(function(response) {
         if ($.isPlainObject(response) && response.status) {
           console.log(response.status);
